@@ -205,17 +205,6 @@ If you intend to open-source this project, adding a permissive license such as [
 For questions, bug reports, or feature requests, please [open an issue](https://github.com/Darshanathrava/secure-vote-chain/issues) on the repository.
 
 ---
-
-## A Note on README Best Practices
-
-A few conventions worth keeping in mind as this document evolves:
-
-- **Lead with a one-line description** of what the project does and who it's for, before diving into details.
-- **Keep installation steps copy-pasteable** — exact commands, in the order they should be run, with no ambiguity about the working directory.
-- **Document environment variables explicitly**, including which are required vs. optional, without ever committing real secret values.
-- **Add a LICENSE file** as soon as possible; GitHub will surface it automatically once present, and it clarifies how others may use your code.
-- **Include screenshots or a short demo GIF** once the UI stabilizes — voting flows are easier to understand visually than in prose.
-- **Keep a CHANGELOG** (even a simple one) if the project moves past prototype stage, so contributors can track what changed between versions.
 - **Badges** (build status, license, last commit) are optional but common in professional repos — consider adding them via [shields.io](https://shields.io/) once CI is set up.
 
 Standard references for structuring future updates to this README: [Make a README](https://www.makeareadme.com/) and GitHub's own [About READMEs](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes) guide.
