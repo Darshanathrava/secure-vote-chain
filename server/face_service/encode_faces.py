@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import cv2
 import numpy as np
@@ -19,8 +20,8 @@ def encode_face(image_path):
             scale = max_width / w
             img_bgr = cv2.resize(img_bgr, (max_width, int(h * scale)))
 
-        # Save resized temp image
-        temp_path = "temp_encode.jpg"
+        temp_dir = os.path.dirname(os.path.abspath(image_path)) or "."
+        temp_path = os.path.join(temp_dir, "temp_encode.jpg")
         cv2.imwrite(temp_path, img_bgr)
 
         # Get face embedding using DeepFace
@@ -30,8 +31,8 @@ def encode_face(image_path):
             enforce_detection=True
         )
 
-        import os
-        os.remove(temp_path)
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
         if result and len(result) > 0:
             return result[0]["embedding"]

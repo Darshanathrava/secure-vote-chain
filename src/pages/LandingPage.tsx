@@ -84,7 +84,7 @@ export default function LandingPage() {
               </span>
             </h1>
 
-            <p className="mt-6 text-lg text-muted-foreground md:text-xl">
+            <p className="mt-6 text-lg text-muted-  foreground md:text-xl">
               A next-generation online voting platform combining biometric authentication
               with blockchain technology. Every vote is encrypted, verified, and permanently recorded.
             </p>

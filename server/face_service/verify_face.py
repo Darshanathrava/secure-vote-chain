@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import cv2
 import numpy as np
@@ -19,7 +20,8 @@ def verify(live_image_path, stored_encoding):
             scale = max_width / w
             img_bgr = cv2.resize(img_bgr, (max_width, int(h * scale)))
 
-        temp_path = "temp_verify.jpg"
+        temp_dir = os.path.dirname(os.path.abspath(live_image_path)) or "."
+        temp_path = os.path.join(temp_dir, "temp_verify.jpg")
         cv2.imwrite(temp_path, img_bgr)
 
         # Get live face embedding
@@ -29,8 +31,8 @@ def verify(live_image_path, stored_encoding):
             enforce_detection=True
         )
 
-        import os
-        os.remove(temp_path)
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
         if not result or len(result) == 0:
             print(json.dumps({"match": False, "reason": "no_face_detected"}))

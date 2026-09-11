@@ -21,8 +21,13 @@ exports.register = async (req, res) => {
     const tmpPath = path.join(__dirname, `../tmp/${voterId}_reg.jpg`);
     fs.mkdirSync(path.dirname(tmpPath), { recursive: true });
     fs.writeFileSync(tmpPath, Buffer.from(faceImageBase64, 'base64'));
-    const faceEncoding = await encodeFace(tmpPath);
-    fs.unlinkSync(tmpPath);
+
+    let faceEncoding;
+    try {
+      faceEncoding = await encodeFace(tmpPath);
+    } finally {
+      if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+    }
 
     if (!faceEncoding) return res.status(400).json({ error: 'No face detected in image' });
 
@@ -61,8 +66,12 @@ exports.login = async (req, res) => {
     const tmpPath = path.join(__dirname, `../tmp/${voterId}_live.jpg`);
     fs.mkdirSync(path.dirname(tmpPath), { recursive: true });
     fs.writeFileSync(tmpPath, Buffer.from(faceImageBase64, 'base64'));
-    const result = await verifyFace(tmpPath, user.faceEncoding);
-    fs.unlinkSync(tmpPath);
+    let result;
+    try {
+      result = await verifyFace(tmpPath, user.faceEncoding);
+    } finally {
+      if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+    }
 
     if (!result.match) return res.status(401).json({ error: 'Face verification failed' });
 

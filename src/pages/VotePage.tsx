@@ -32,19 +32,27 @@ export default function VotePage() {
       if (res.data && res.data.length > 0) {
         setElection(res.data[0]);
         setCandidates(res.data[0].candidates || []);
+        return;
       }
+
+      const candidatesRes = await api.get("/candidates");
+      setCandidates(candidatesRes.data || []);
     } catch {
-      // fallback to contract
       try {
-        const { getTotalCandidates, getCandidateVotes } = await import("@/lib/contract");
-        const total = await getTotalCandidates();
-        const list = [];
-        for (let i = 1; i <= total; i++) {
-          list.push(await getCandidateVotes(i));
+        const candidatesRes = await api.get("/candidates");
+        setCandidates(candidatesRes.data || []);
+      } catch {
+        try {
+          const { getTotalCandidates, getCandidateVotes } = await import("@/lib/contract");
+          const total = await getTotalCandidates();
+          const list = [];
+          for (let i = 1; i <= total; i++) {
+            list.push(await getCandidateVotes(i));
+          }
+          setCandidates(list);
+        } catch {
+          toast({ title: "Error", description: "Could not load candidates", variant: "destructive" });
         }
-        setCandidates(list);
-      } catch (err) {
-        toast({ title: "Error", description: "Could not load candidates", variant: "destructive" });
       }
     }
   };
@@ -197,6 +205,11 @@ export default function VotePage() {
         {/* Candidates */}
         <div className="mt-6 space-y-4">
           <h2 className="font-display text-lg font-semibold">Select Your Candidate</h2>
+          {candidates.length === 0 && (
+            <p className="rounded-lg border border-border bg-muted/50 p-4 text-sm text-muted-foreground">
+              No candidates have been added yet. An admin can add them from the Admin dashboard.
+            </p>
+          )}
           {candidates.map((candidate, i) => (
             <motion.div key={candidate.id || candidate._id || i}
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}

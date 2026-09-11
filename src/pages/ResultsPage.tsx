@@ -13,21 +13,20 @@ export default function ResultsPage() {
   const [candidates, setCandidates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchResults();
-  }, []);
-
   const fetchResults = async () => {
     try {
-      // Try backend first
       const res = await api.get("/elections");
-      if (res.data?.[0]?.candidates) {
+      if (res.data?.[0]?.candidates?.length) {
         setCandidates(res.data[0].candidates);
+        return;
+      }
+      const candidatesRes = await api.get("/candidates");
+      if (candidatesRes.data?.length) {
+        setCandidates(candidatesRes.data);
         return;
       }
     } catch {}
 
-    // Fallback: read directly from blockchain
     try {
       const total = await getTotalCandidates();
       const list = [];
@@ -37,10 +36,12 @@ export default function ResultsPage() {
       setCandidates(list);
     } catch (err) {
       console.error("Could not fetch results:", err);
-    } finally {
-      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchResults().finally(() => setLoading(false));
+  }, []);
 
   const totalVotes = candidates.reduce((s, c) => s + (c.voteCount || c.votes || 0), 0);
   const chartData = candidates.map((c, i) => ({
