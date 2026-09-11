@@ -18,7 +18,6 @@ The goal of the project is to demonstrate how decentralized ledgers and biometri
 - [Contributing Guidelines](#contributing-guidelines)
 - [License](#license)
 - [Contact](#contact)
-- [README Best Practices](#a-note-on-readme-best-practices)
 
 ## Features
 
