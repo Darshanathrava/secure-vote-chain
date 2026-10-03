@@ -9,7 +9,6 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
-import { connectWallet } from "@/lib/contract";
 
 type AuthState = "idle" | "capturing" | "verifying" | "verified" | "failed";
 
@@ -73,21 +72,8 @@ export default function AuthenticatePage() {
       clearInterval(interval);
       setProgress(100);
 
-      // Save token and voterId
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("voterId", voterId);
-
-      // Connect MetaMask wallet
-      if (res.data.walletAddress) {
-        localStorage.setItem("walletAddress", res.data.walletAddress);
-      } else {
-        try {
-          const wallet = await connectWallet();
-          localStorage.setItem("walletAddress", wallet);
-        } catch {
-          // MetaMask optional at login
-        }
-      }
 
       setSimilarity(res.data.similarity || 0.99);
       setState("verified");

@@ -6,6 +6,7 @@ const cors = require('cors');
 const authRoutes = require('./Routes/AuthRoute');
 const voteRoutes = require('./Routes/voteRoute');
 const adminRoutes = require('./Routes/adminRoute');
+const webauthnRoutes = require('./Routes/webauthnRoute');
 
 const app = express();
 app.use(cors());
@@ -14,26 +15,19 @@ app.use(express.json({ limit: '10mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/vote', voteRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/webauthn', webauthnRoutes);
 
 async function getCandidatesWithVotes() {
   const Candidate = require('./Models/Candidate');
-  const User = require('./Models/User');
-  const candidates = await Candidate.find().sort({ createdAt: 1 });
-  const voteCounts = await User.aggregate([
-    { $match: { hasVoted: true, votedCandidate: { $ne: null } } },
-    { $group: { _id: '$votedCandidate', votes: { $sum: 1 } } },
-  ]);
-  const votesById = Object.fromEntries(voteCounts.map((row) => [String(row._id), row.votes]));
+  const candidates = await Candidate.find().sort({ votes: -1, createdAt: 1 });
 
-  return candidates.map((candidate, index) => {
-    const blockchainId = candidate.blockchainCandidateId || index + 1;
-    return {
-      ...candidate.toObject(),
-      id: candidate._id,
-      blockchainCandidateId: blockchainId,
-      voteCount: votesById[String(blockchainId)] || 0,
-    };
-  });
+  return candidates.map((candidate, index) => ({
+    ...candidate.toObject(),
+    id: candidate._id,
+    blockchainCandidateId: candidate.blockchainCandidateId || index + 1,
+    votes: candidate.votes || 0,
+    voteCount: candidate.votes || 0,
+  }));
 }
 
 app.get('/api/candidates', async (req, res) => {

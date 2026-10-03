@@ -5,6 +5,7 @@ const CandidateSchema = new mongoose.Schema({
   party:                 { type: String, required: true },
   region:                { type: String, default: 'National' },
   symbol:                { type: String },
+  votes:                 { type: Number, default: 0 },
   blockchainCandidateId: { type: Number },
   createdAt:             { type: Date, default: Date.now }
 });

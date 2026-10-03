@@ -82,7 +82,11 @@ exports.login = async (req, res) => {
       { expiresIn: '2h' }
     );
 
-    res.json({ token, walletAddress: user.walletAddress });
+    res.json({
+      token,
+      similarity: result.similarity ?? null,
+      fingerprintRegistered: Boolean(user.webauthnCredential?.id),
+    });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed' });

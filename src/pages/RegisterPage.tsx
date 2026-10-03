@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useFingerprint } from "@/hooks/useFingerprint";
 import api from "@/lib/api";
 
 type Step = "personal" | "biometric" | "review";
@@ -18,10 +19,12 @@ export default function RegisterPage() {
   });
   const [faceImage, setFaceImage] = useState<string | null>(null);
   const [faceCapturing, setFaceCapturing] = useState(false);
+  const [fingerprintEnrolled, setFingerprintEnrolled] = useState(false);
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { toast } = useToast();
+  const { enrollFingerprint } = useFingerprint();
 
   const startCamera = async () => {
     setFaceCapturing(true);
@@ -61,10 +64,23 @@ export default function RegisterPage() {
         email: formData.email,
         password: formData.password,
         faceImageBase64: faceImage,
-        walletAddress: "",
       });
+
+      // Enroll Windows Hello / Touch ID after account creation
+      try {
+        const fp = await enrollFingerprint(formData.idNumber);
+        setFingerprintEnrolled(fp.verified);
+        if (!fp.verified) throw new Error("Fingerprint enrollment not verified");
+        toast({ title: "Registration Successful!", description: "Face and fingerprint enrolled." });
+      } catch (fpErr: any) {
+        toast({
+          title: "Account created — fingerprint incomplete",
+          description: fpErr?.response?.data?.error || fpErr.message || "You can enroll fingerprint later from Windows Hello.",
+          variant: "destructive",
+        });
+      }
+
       setRegistered(true);
-      toast({ title: "Registration Successful!", description: "Your voter registration is on the blockchain." });
     } catch (err: any) {
       toast({
         title: "Registration Failed",
@@ -94,11 +110,15 @@ export default function RegisterPage() {
                 </div>
                 <h2 className="mt-6 font-display text-2xl font-bold">Registration Complete!</h2>
                 <p className="mt-2 text-muted-foreground">
-                  Your voter identity has been enrolled with facial recognition and recorded on the blockchain.
+                  Your voter identity has been enrolled with facial recognition
+                  {fingerprintEnrolled ? " and fingerprint authentication." : "."}
                 </p>
                 <div className="mt-6 w-full rounded-lg border border-border bg-muted/50 p-4 text-left space-y-2">
                   <p className="text-xs text-muted-foreground">Voter ID</p>
                   <p className="font-mono font-bold">{formData.idNumber}</p>
+                  <p className="pt-2 text-xs text-muted-foreground">
+                    Face: enrolled · Fingerprint: {fingerprintEnrolled ? "enrolled" : "not enrolled"}
+                  </p>
                 </div>
                 <Button className="mt-6 w-full" onClick={() => window.location.href = "/authenticate"}>
                   Proceed to Login
@@ -115,7 +135,7 @@ export default function RegisterPage() {
     <div className="container mx-auto px-4 py-12">
       <div className="mx-auto max-w-2xl">
         <h1 className="font-display text-3xl font-bold md:text-4xl">Voter Registration</h1>
-        <p className="mt-2 text-muted-foreground">Secure, blockchain-backed voter enrollment</p>
+        <p className="mt-2 text-muted-foreground">Secure biometric voter enrollment</p>
 
         <div className="mt-8 flex items-center gap-2">
           {steps.map((s, i) => (
@@ -232,18 +252,20 @@ export default function RegisterPage() {
                 </CardContent>
               </Card>
 
-              <Card className="opacity-60">
+              <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 font-display">
                     <Fingerprint className="h-5 w-5 text-primary" /> Fingerprint Enrollment
                   </CardTitle>
-                  <CardDescription>Hardware sensor required (simulated)</CardDescription>
+                  <CardDescription>Windows Hello / Touch ID will enroll after you submit registration</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex h-36 w-36 mx-auto items-center justify-center rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5">
-                    <CheckCircle2 className="h-14 w-14 text-success" />
+                    <Fingerprint className="h-14 w-14 text-primary" />
                   </div>
-                  <p className="mt-4 text-center text-xs text-muted-foreground">Fingerprint simulated for demo purposes</p>
+                  <p className="mt-4 text-center text-xs text-muted-foreground">
+                    Platform authenticator required (fingerprint or PIN)
+                  </p>
                 </CardContent>
               </Card>
 
@@ -260,7 +282,7 @@ export default function RegisterPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="font-display">Review & Submit</CardTitle>
-                <CardDescription>Confirm your details before blockchain registration</CardDescription>
+                <CardDescription>Confirm your details before completing registration</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3">
@@ -283,6 +305,15 @@ export default function RegisterPage() {
                   <div>
                     <p className="text-sm font-medium">Face Biometric Enrolled</p>
                     <p className="text-xs text-muted-foreground">128-dimensional AI face encoding ready for secure storage</p>
+                  </div>
+                </div>
+                <div className="flex gap-4 rounded-lg border border-primary/30 bg-primary/5 p-4">
+                  <Fingerprint className="h-5 w-5 shrink-0 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium">Fingerprint via Windows Hello / Touch ID</p>
+                    <p className="text-xs text-muted-foreground">
+                      After submit, your browser will prompt to enroll a platform authenticator
+                    </p>
                   </div>
                 </div>
                 <div className="flex gap-4 rounded-lg border border-primary/30 bg-primary/5 p-4">

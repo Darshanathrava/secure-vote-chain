@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { BarChart3, TrendingUp, Users, Clock, CheckCircle2 } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { getTotalCandidates, getCandidateVotes } from "@/lib/contract";
 import api from "@/lib/api";
 
 export default function ResultsPage() {
@@ -15,25 +13,8 @@ export default function ResultsPage() {
 
   const fetchResults = async () => {
     try {
-      const res = await api.get("/elections");
-      if (res.data?.[0]?.candidates?.length) {
-        setCandidates(res.data[0].candidates);
-        return;
-      }
-      const candidatesRes = await api.get("/candidates");
-      if (candidatesRes.data?.length) {
-        setCandidates(candidatesRes.data);
-        return;
-      }
-    } catch {}
-
-    try {
-      const total = await getTotalCandidates();
-      const list = [];
-      for (let i = 1; i <= total; i++) {
-        list.push(await getCandidateVotes(i));
-      }
-      setCandidates(list);
+      const res = await api.get("/vote/results");
+      setCandidates(res.data.candidates || []);
     } catch (err) {
       console.error("Could not fetch results:", err);
     }
@@ -45,7 +26,7 @@ export default function ResultsPage() {
 
   const totalVotes = candidates.reduce((s, c) => s + (c.voteCount || c.votes || 0), 0);
   const chartData = candidates.map((c, i) => ({
-    name: c.name?.split(" ").pop() || `C${i+1}`,
+    name: c.name?.split(" ").pop() || `C${i + 1}`,
     votes: c.voteCount || c.votes || 0,
     color: ["#6366f1", "#8b5cf6", "#06b6d4", "#10b981"][i % 4],
   }));
@@ -53,10 +34,10 @@ export default function ResultsPage() {
   return (
     <div className="container mx-auto px-4 py-12">
       <h1 className="font-display text-3xl font-bold md:text-4xl">Election Results</h1>
-      <p className="mt-2 text-muted-foreground">Real-time, blockchain-verified vote tallying</p>
+      <p className="mt-2 text-muted-foreground">Live tallies from verified biometric votes</p>
 
       {loading ? (
-        <p className="mt-8 text-muted-foreground">Loading results from blockchain...</p>
+        <p className="mt-8 text-muted-foreground">Loading results...</p>
       ) : (
         <div className="mt-8 grid gap-6 lg:grid-cols-2">
           <Card>
@@ -97,15 +78,20 @@ export default function ResultsPage() {
                 const pct = totalVotes > 0 ? ((votes / totalVotes) * 100).toFixed(1) : "0";
                 const colors = ["#6366f1", "#8b5cf6", "#06b6d4", "#10b981"];
                 return (
-                  <motion.div key={c.id || i}
-                    initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.1 }}>
+                  <motion.div
+                    key={c.id || c._id || i}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                  >
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
                         <div className="h-3 w-3 rounded-full" style={{ backgroundColor: colors[i % 4] }} />
                         <span className="font-medium">{c.name}</span>
                         {i === 0 && totalVotes > 0 && (
-                          <Badge variant="default" className="text-[10px]">Leading</Badge>
+                          <Badge variant="default" className="text-[10px]">
+                            Leading
+                          </Badge>
                         )}
                       </div>
                       <span className="font-display font-bold">{pct}%</span>
