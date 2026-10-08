@@ -204,8 +204,8 @@ export default function AdminPage() {
                 <div className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-xs text-muted-foreground">
                   <p className="font-medium mb-1">First time setup?</p>
                   <p>Run this in your terminal to create the admin account:</p>
-                  <code className="mt-1 block font-mono text-xs">
-                    curl -X POST http://localhost:1322/api/admin/setup -H "Content-Type: application/json" -d "{`{\"username\":\"admin\",\"password\":\"admin123\"}`}"
+                  <code className="mt-1 block break-all font-mono text-xs">
+                    {`curl -X POST ${(import.meta.env.VITE_API_URL || "http://localhost:1322/api").replace(/\/$/, "")}/admin/setup -H "Content-Type: application/json" -d "{\\"username\\":\\"admin\\",\\"password\\":\\"admin123\\"}"`}
                   </code>
                 </div>
               </CardContent>

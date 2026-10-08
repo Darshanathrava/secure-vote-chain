@@ -131,6 +131,12 @@ On the frontend, the deployed contract address is read from `src/lib/constants.t
 
 **Never commit your `.env` file or private keys.** Ensure `server/.env` stays listed in `.gitignore`.
 
+## Production deploy (Vercel + Render)
+
+See **[DEPLOY.md](DEPLOY.md)** for deploying the Vite frontend to Vercel and the Express + DeepFace API to Render (Docker) with MongoDB Atlas.
+
+Required env templates: [`.env.example`](.env.example) (frontend) and [`server/.env.example`](server/.env.example) (backend).
+
 ## Running the Project
 
 1. **Start Ganache** and note the RPC URL (defaults to `http://127.0.0.1:7545`).

@@ -9,8 +9,29 @@ const adminRoutes = require('./Routes/adminRoute');
 const webauthnRoutes = require('./Routes/webauthnRoute');
 
 const app = express();
-app.use(cors());
+
+const allowedOrigins = (process.env.FRONTEND_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, callback) {
+    // Allow non-browser clients (no Origin) and configured frontends
+    if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '10mb' }));
+
+// Health check for Render / load balancers
+app.get('/health', (_req, res) => {
+  res.json({ ok: true });
+});
+
 
 app.use('/api/auth', authRoutes);
 app.use('/api/vote', voteRoutes);

@@ -1,4 +1,7 @@
 import axios from 'axios';
-const api = axios.create({ baseURL: 'http://localhost:1322/api' });
-//                                              ↑ Change 5000 to 1322 (your actual port)
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:1322/api',
+});
+
 export default api;
