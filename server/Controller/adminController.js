@@ -143,11 +143,27 @@ exports.addRegion = async (req, res) => {
   try {
     const Region = require('../Models/Region');
     const { name, code, description } = req.body;
-    const region = new Region({ name, code, description });
+
+    if (!name?.trim() || !code?.trim()) {
+      return res.status(400).json({ error: 'Region name and code are required' });
+    }
+
+    const region = new Region({
+      name: name.trim(),
+      code: code.trim().toUpperCase(),
+      description: description?.trim() || '',
+    });
     await region.save();
     res.status(201).json({ message: 'Region added', region });
   } catch (err) {
-    res.status(500).json({ error: 'Could not add region' });
+    console.error('Add region error:', err);
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern || {})[0] || 'name/code';
+      return res.status(400).json({
+        error: `A region with this ${field} already exists`,
+      });
+    }
+    res.status(500).json({ error: err.message || 'Could not add region' });
   }
 };
 

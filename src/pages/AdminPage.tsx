@@ -125,17 +125,36 @@ export default function AdminPage() {
 
   // ── REGIONS ──
   const handleAddRegion = async () => {
-    if (!newRegion.name || !newRegion.code) {
+    if (!newRegion.name.trim() || !newRegion.code.trim()) {
       toast({ title: "Missing fields", description: "Name and code are required", variant: "destructive" });
       return;
     }
+    if (!adminToken()) {
+      toast({ title: "Not logged in", description: "Please log in as admin again", variant: "destructive" });
+      setIsLoggedIn(false);
+      return;
+    }
     try {
-      await api.post("/admin/regions", newRegion, authHeaders());
+      await api.post("/admin/regions", {
+        name: newRegion.name.trim(),
+        code: newRegion.code.trim().toUpperCase(),
+        description: newRegion.description.trim(),
+      }, authHeaders());
       setNewRegion({ name: "", code: "", description: "" });
-      fetchAll();
+      await fetchAll();
       toast({ title: "Region Added ✓" });
     } catch (err: any) {
-      toast({ title: "Error", description: err?.response?.data?.error, variant: "destructive" });
+      const status = err?.response?.status;
+      const message =
+        err?.response?.data?.error ||
+        (err?.code === "ERR_NETWORK" ? "Backend is not running (start with npm run dev)" : null) ||
+        err.message ||
+        "Could not add region";
+      if (status === 401 || status === 403) {
+        localStorage.removeItem("adminToken");
+        setIsLoggedIn(false);
+      }
+      toast({ title: "Error", description: message, variant: "destructive" });
     }
   };
 
