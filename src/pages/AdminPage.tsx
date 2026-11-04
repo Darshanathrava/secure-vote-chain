@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Shield, Users, Vote, BarChart3, Blocks, Activity,
-  LogOut, Plus, Trash2, Edit2, MapPin, CheckCircle2, X
+  LogOut, Plus, Trash2, Edit2, MapPin, CheckCircle2, X,
+  RefreshCw, Search, CheckCircle, Clock
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,9 +19,12 @@ export default function AdminPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [candidates, setCandidates] = useState<any[]>([]);
   const [regions, setRegions] = useState<any[]>([]);
+  const [voters, setVoters] = useState<any[]>([]);
+  const [voterSearch, setVoterSearch] = useState("");
 
   // Candidate form
   const [newCandidate, setNewCandidate] = useState({ name: "", party: "", region: "National", blockchainCandidateId: "" });
@@ -43,17 +47,42 @@ export default function AdminPage() {
   }, []);
 
   const fetchAll = async () => {
+    setLoadingData(true);
     try {
-      const [statsRes, candidatesRes, regionsRes] = await Promise.all([
+      const results = await Promise.allSettled([
         api.get("/admin/stats", authHeaders()),
         api.get("/admin/candidates", authHeaders()),
         api.get("/admin/regions", authHeaders()),
+        api.get("/admin/voters", authHeaders()),
       ]);
-      setStats(statsRes.data);
-      setCandidates(candidatesRes.data);
-      setRegions(regionsRes.data);
+
+      const [statsRes, candidatesRes, regionsRes, votersRes] = results;
+
+      if (statsRes.status === "fulfilled") {
+        setStats(statsRes.value.data);
+      } else {
+        const status = statsRes.reason?.response?.status;
+        if (status === 401 || status === 403) {
+          localStorage.removeItem("adminToken");
+          setIsLoggedIn(false);
+          toast({ title: "Session expired", description: "Please log in again", variant: "destructive" });
+          return;
+        }
+      }
+
+      if (candidatesRes.status === "fulfilled") {
+        setCandidates(candidatesRes.value.data);
+      }
+      if (regionsRes.status === "fulfilled") {
+        setRegions(regionsRes.value.data);
+      }
+      if (votersRes.status === "fulfilled") {
+        setVoters(votersRes.value.data);
+      }
     } catch (err) {
       console.error("Fetch error:", err);
+    } finally {
+      setLoadingData(false);
     }
   };
 
@@ -82,7 +111,29 @@ export default function AdminPage() {
     setStats(null);
     setCandidates([]);
     setRegions([]);
+    setVoters([]);
   };
+
+  const handleDeleteVoter = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this registered voter?")) return;
+    try {
+      await api.delete(`/admin/voters/${id}`, authHeaders());
+      fetchAll();
+      toast({ title: "Voter Deleted ✓" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.response?.data?.error || "Could not delete voter", variant: "destructive" });
+    }
+  };
+
+  const filteredVoters = voters.filter((v) => {
+    if (!voterSearch.trim()) return true;
+    const q = voterSearch.toLowerCase();
+    return (
+      (v.name && v.name.toLowerCase().includes(q)) ||
+      (v.voterId && v.voterId.toLowerCase().includes(q)) ||
+      (v.email && v.email.toLowerCase().includes(q))
+    );
+  });
 
   // ── CANDIDATES ──
   const handleAddCandidate = async () => {
@@ -430,13 +481,24 @@ export default function AdminPage() {
         </TabsContent>
 
         {/* ── VOTERS TAB ── */}
-        <TabsContent value="voters" className="mt-4">
+        <TabsContent value="voters" className="mt-4 space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="font-display">Voter Statistics</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div>
+                <CardTitle className="font-display">Voter Statistics</CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">Real-time voter turnout and registration metrics</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={fetchAll} disabled={loadingData} className="gap-2">
+                <RefreshCw className={`h-3.5 w-3.5 ${loadingData ? "animate-spin" : ""}`} /> Refresh
+              </Button>
             </CardHeader>
             <CardContent>
-              {stats && (
+              {loadingData && !stats ? (
+                <div className="py-8 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
+                  <RefreshCw className="h-6 w-6 animate-spin text-primary" />
+                  <p className="text-sm">Loading voter statistics...</p>
+                </div>
+              ) : stats ? (
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 gap-4">
                     <div className="rounded-lg bg-muted/50 p-4 text-center">
@@ -466,6 +528,104 @@ export default function AdminPage() {
                       {stats.voters > 0 ? ((stats.votedCount / stats.voters) * 100).toFixed(1) : 0}% participation
                     </p>
                   </div>
+                </div>
+              ) : (
+                <div className="py-6 text-center text-muted-foreground space-y-2">
+                  <p className="text-sm">Unable to load voter statistics.</p>
+                  <Button variant="outline" size="sm" onClick={fetchAll} className="gap-1">
+                    <RefreshCw className="h-3 w-3" /> Retry
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ── REGISTERED VOTERS LIST ── */}
+          <Card>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle className="font-display flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" /> Registered Voters ({voters.length})
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">Individual voter credentials and ballot status</p>
+              </div>
+              <div className="w-full sm:w-64">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name, ID, or email..."
+                    className="pl-8 text-xs"
+                    value={voterSearch}
+                    onChange={(e) => setVoterSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingData && voters.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
+                  <RefreshCw className="h-6 w-6 animate-spin text-primary" />
+                  <p className="text-sm">Loading voters list...</p>
+                </div>
+              ) : voters.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  <p>No registered voters found in the database.</p>
+                </div>
+              ) : filteredVoters.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  <p>No voters match "{voterSearch}".</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
+                  {filteredVoters.map((voter) => (
+                    <div
+                      key={voter._id}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-3 bg-card hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 font-bold text-primary shrink-0">
+                          {voter.name?.charAt(0) || "V"}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-sm">{voter.name || "Unnamed Voter"}</p>
+                            <Badge variant="outline" className="font-mono text-[10px]">
+                              {voter.voterId}
+                            </Badge>
+                            {voter.hasVoted ? (
+                              <Badge className="bg-success/15 text-success border-success/30 text-[10px] gap-1">
+                                <CheckCircle className="h-3 w-3" /> Voted
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-[10px] gap-1 text-muted-foreground">
+                                <Clock className="h-3 w-3" /> Pending
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">{voter.email}</p>
+                          {voter.transactionHash && (
+                            <p className="text-[11px] font-mono text-muted-foreground mt-1 truncate max-w-xs sm:max-w-md">
+                              Tx: {voter.transactionHash}
+                            </p>
+                          )}
+                          <p className="text-[10px] text-muted-foreground/75 mt-1">
+                            Registered: {voter.createdAt ? new Date(voter.createdAt).toLocaleDateString() : "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 self-end sm:self-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteVoter(voter._id)}
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                          title="Delete voter"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>

@@ -177,3 +177,30 @@ exports.deleteRegion = async (req, res) => {
     res.status(500).json({ error: 'Could not delete region' });
   }
 };
+
+// ── VOTERS ──────────────────────────────────────────────
+
+// GET /api/admin/voters
+exports.getVoters = async (req, res) => {
+  try {
+    const User = getUserModel();
+    if (!User) return res.json([]);
+    const voters = await User.find({}, '-password -faceEncoding').sort({ createdAt: -1 });
+    res.json(voters);
+  } catch (err) {
+    console.error('Fetch voters error:', err);
+    res.status(500).json({ error: 'Could not fetch voters' });
+  }
+};
+
+// DELETE /api/admin/voters/:id
+exports.deleteVoter = async (req, res) => {
+  try {
+    const User = getUserModel();
+    if (!User) return res.status(404).json({ error: 'User model not available' });
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Voter deleted' });
+  } catch (err) {
+    res.status(500).json({ error: 'Could not delete voter' });
+  }
+};

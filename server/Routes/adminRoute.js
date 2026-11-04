@@ -4,7 +4,8 @@ const adminAuth = require('../middleware/adminAuth');
 const {
   adminLogin, setupAdmin, getStats,
   getCandidates, addCandidate, updateCandidate, deleteCandidate,
-  getRegions, addRegion, deleteRegion
+  getRegions, addRegion, deleteRegion,
+  getVoters, deleteVoter
 } = require('../Controller/adminController');
 
 // Public
@@ -20,5 +21,7 @@ router.delete('/candidates/:id', adminAuth, deleteCandidate);
 router.get('/regions', adminAuth, getRegions);
 router.post('/regions', adminAuth, addRegion);
 router.delete('/regions/:id', adminAuth, deleteRegion);
+router.get('/voters', adminAuth, getVoters);
+router.delete('/voters/:id', adminAuth, deleteVoter);
 
 module.exports = router;

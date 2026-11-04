@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -85,6 +86,7 @@ app.get('/api/elections', async (req, res) => {
   }
 });
 
+mongoose.set('strictQuery', false);
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log('Connected With DB Successfull');
@@ -92,4 +94,7 @@ mongoose.connect(process.env.MONGO_URI)
       console.log(`Server is Listening on PORT ${process.env.PORT || 1322}`);
     });
   })
-  .catch(err => console.error('DB connection error:', err));
+  .catch(err => {
+    console.error('DB connection error:', err);
+    process.exit(1);
+  });

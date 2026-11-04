@@ -1,9 +1,38 @@
-node_modules
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Production builds
+dist/
 dist
+build/
+client/build/
+.vercel
+
+# Environment variables (NEVER commit secrets)
 .env
+.env.*
 .env.local
+!.env.example
+!.env.local.example
 server/.env
-server/venv
-server/tmp
+server/.env.*
+!server/.env.example
+
+# Python virtual environment & binaries
+server/venv/
+venv/
+*.whl
+*.exe
+
+# Temp files, uploads, and logs
+server/tmp/
+server/Faces/
+server/temp_encode.jpg
+temp_face.jpg
+test.JPG
+test_embedding.json
 *.log
 .DS_Store
+.cursor/
