@@ -3,6 +3,7 @@ services:
   - type: web
     name: secure-vote-chain-api
     runtime: docker
+    plan: free
     rootDir: server
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
