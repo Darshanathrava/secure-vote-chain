@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { useFingerprint, captureWithDetails, getDeviceInfo, type FingerprintScan } from "@/hooks/useFingerprint";
 import FingerprintDevicePanel from "@/components/FingerprintDevicePanel";
-import api from "@/lib/api";
+import api, { describeApiError } from "@/lib/api";
 
 type Step = "personal" | "biometric" | "review";
 
@@ -105,7 +105,7 @@ export default function RegisterPage() {
       } catch (fpErr: any) {
         toast({
           title: "Account created — fingerprint incomplete",
-          description: fpErr?.response?.data?.error || fpErr.message || "Make sure the Mantra RD Service is running.",
+          description: describeApiError(fpErr, "Make sure the Mantra RD Service is running."),
           variant: "destructive",
         });
       }
@@ -114,7 +114,7 @@ export default function RegisterPage() {
     } catch (err: any) {
       toast({
         title: "Registration Failed",
-        description: err?.response?.data?.error || "Something went wrong",
+        description: describeApiError(err),
         variant: "destructive"
       });
     } finally {
