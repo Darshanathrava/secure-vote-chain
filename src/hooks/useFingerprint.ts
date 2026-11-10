@@ -106,14 +106,22 @@ export async function getDeviceInfo(): Promise<FingerprintDeviceInfo> {
   };
 }
 
-/** Test scan: capture a finger and report its quality. Nothing is saved. */
-export async function testScan(): Promise<FingerprintScan> {
-  const xml = await captureFinger();
+/** Capture a finger and return both the PID block and its quality details. */
+export async function captureWithDetails(): Promise<{ pidXml: string; scan: FingerprintScan }> {
+  const pidXml = await captureFinger();
   const num = (n: string) => {
-    const v = attr(xml, "Resp", n);
+    const v = attr(pidXml, "Resp", n);
     return v === "" ? null : Number(v);
   };
-  return { quality: num("qScore"), minutiae: num("nmPoints"), fingerCount: num("fCount") };
+  return {
+    pidXml,
+    scan: { quality: num("qScore"), minutiae: num("nmPoints"), fingerCount: num("fCount") },
+  };
+}
+
+/** Test scan: capture a finger and report its quality. Nothing is saved. */
+export async function testScan(): Promise<FingerprintScan> {
+  return (await captureWithDetails()).scan;
 }
 
 /**
@@ -128,11 +136,17 @@ export function useFingerprint() {
     return { verified: Boolean(data.verified) };
   };
 
+  /** Enroll using a capture the voter already took (Register page). */
+  const enrollWithCapture = async (voterId: string, pidXml: string): Promise<FingerprintResult> => {
+    const { data } = await api.post("/fingerprint/enroll", { voterId, pidXml });
+    return { verified: Boolean(data.verified) };
+  };
+
   const verifyFingerprint = async (voterId: string): Promise<FingerprintResult> => {
     const pidXml = await captureFinger();
     const { data } = await api.post("/fingerprint/verify", { voterId, pidXml });
     return { verified: Boolean(data.verified) };
   };
 
-  return { enrollFingerprint, verifyFingerprint };
+  return { enrollFingerprint, enrollWithCapture, verifyFingerprint };
 }
