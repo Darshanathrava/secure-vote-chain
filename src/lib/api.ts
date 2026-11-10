@@ -1,8 +1,10 @@
 import axios from 'axios';
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:1322/api',
-});
+// VITE_API_URL may be the bare server URL or end in /api; always end up with exactly one /api.
+const rawBase: string = import.meta.env.VITE_API_URL || 'http://localhost:1322';
+const baseURL = rawBase.trim().replace(/\/+$/, '').replace(/\/api$/, '') + '/api';
+
+const api = axios.create({ baseURL });
 
 /** Turn an axios error into a message that says what actually went wrong. */
 export function describeApiError(err: any, fallback = "Something went wrong"): string {
