@@ -66,7 +66,7 @@ export default function RegisterPage() {
         faceImageBase64: faceImage,
       });
 
-      // Enroll Windows Hello / Touch ID after account creation
+      // Enroll fingerprint on the Mantra MFS110 after account creation
       try {
         const fp = await enrollFingerprint(formData.idNumber);
         setFingerprintEnrolled(fp.verified);
@@ -75,7 +75,7 @@ export default function RegisterPage() {
       } catch (fpErr: any) {
         toast({
           title: "Account created — fingerprint incomplete",
-          description: fpErr?.response?.data?.error || fpErr.message || "You can enroll fingerprint later from Windows Hello.",
+          description: fpErr?.response?.data?.error || fpErr.message || "Make sure the Mantra RD Service is running.",
           variant: "destructive",
         });
       }
@@ -257,14 +257,14 @@ export default function RegisterPage() {
                   <CardTitle className="flex items-center gap-2 font-display">
                     <Fingerprint className="h-5 w-5 text-primary" /> Fingerprint Enrollment
                   </CardTitle>
-                  <CardDescription>Windows Hello / Touch ID will enroll after you submit registration</CardDescription>
+                  <CardDescription>Place your finger on the Mantra scanner when prompted after you submit</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex h-36 w-36 mx-auto items-center justify-center rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5">
                     <Fingerprint className="h-14 w-14 text-primary" />
                   </div>
                   <p className="mt-4 text-center text-xs text-muted-foreground">
-                    Platform authenticator required (fingerprint or PIN)
+                    Mantra MFS110 + RD Service required (use Chrome or Edge on the scanner PC)
                   </p>
                 </CardContent>
               </Card>
@@ -310,9 +310,9 @@ export default function RegisterPage() {
                 <div className="flex gap-4 rounded-lg border border-primary/30 bg-primary/5 p-4">
                   <Fingerprint className="h-5 w-5 shrink-0 text-primary" />
                   <div>
-                    <p className="text-sm font-medium">Fingerprint via Windows Hello / Touch ID</p>
+                    <p className="text-sm font-medium">Fingerprint via Mantra MFS110</p>
                     <p className="text-xs text-muted-foreground">
-                      After submit, your browser will prompt to enroll a platform authenticator
+                      After submit, place your finger on the scanner to enroll
                     </p>
                   </div>
                 </div>

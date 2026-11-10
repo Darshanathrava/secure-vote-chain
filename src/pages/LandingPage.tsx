@@ -14,7 +14,7 @@ const features = [
   {
     icon: Fingerprint,
     title: "Fingerprint Auth",
-    description: "WebAuthn/FIDO2 biometric authentication providing a hardware-backed second factor.",
+    description: "Mantra MFS110 fingerprint scanner (RD Service) providing a hardware-backed second factor.",
   },
   {
     icon: Blocks,

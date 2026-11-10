@@ -16,6 +16,13 @@ const UserSchema = new mongoose.Schema({
     counter:    { type: Number, default: 0 },
     transports: { type: [String], default: [] },
   },
+  fingerprint: {
+    registered:     { type: Boolean, default: false },
+    device:         { type: String },
+    enrolledAt:     { type: Date },
+    lastVerifiedAt: { type: Date },
+    usedCaptures:   { type: [String], default: [] },
+  },
   createdAt:       { type: Date, default: Date.now }
 });
 

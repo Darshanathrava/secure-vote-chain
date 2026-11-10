@@ -247,7 +247,7 @@ export default function VotePage() {
 
         <div className="mt-4 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/5 p-3 text-sm">
           <Lock className="h-4 w-4 text-warning" />
-          <span>Face verification required. Fingerprint is optional if you have no sensor.</span>
+          <span>Face verification required. Fingerprint is optional if no Mantra scanner is connected.</span>
         </div>
 
         {/* Progress steps */}
@@ -322,7 +322,7 @@ export default function VotePage() {
                   disabled={!faceVerified || fpLoading}
                 >
                   <Fingerprint className="h-4 w-4" />
-                  {fpLoading ? "Waiting for Windows Hello / Touch ID..." : "Verify Fingerprint"}
+                  {fpLoading ? "Place finger on Mantra scanner..." : "Verify Fingerprint"}
                 </Button>
                 <p className="text-center text-xs text-muted-foreground">or</p>
                 <Button
