@@ -42,8 +42,6 @@ Browser → Vercel (Vite SPA)
    | `MONGO_URI` | Atlas URI from step 1 |
    | `JWT_SECRET` | long random string |
    | `FRONTEND_ORIGIN` | `https://YOUR_APP.vercel.app` (update after Vercel deploy; include preview origins comma-separated if needed) |
-   | `WEBAUTHN_RP_ID` | `YOUR_APP.vercel.app` (no `https://`) |
-   | `WEBAUTHN_ORIGIN` | `https://YOUR_APP.vercel.app` |
    | `PYTHON_PATH` | `/usr/bin/python3` |
 
 4. Deploy. First Docker build is **large and slow** (TensorFlow/DeepFace).
@@ -74,7 +72,7 @@ curl -X POST https://YOUR_RENDER_URL/api/admin/setup \
    | `VITE_API_URL` | `https://YOUR_RENDER_URL/api` |
 
 5. Deploy. Note the URL, e.g. `https://secure-vote-chain.vercel.app`.
-6. Go back to **Render** and set `FRONTEND_ORIGIN`, `WEBAUTHN_RP_ID`, and `WEBAUTHN_ORIGIN` to match the Vercel URL, then **redeploy** the backend.
+6. Go back to **Render** and set `FRONTEND_ORIGIN` to the Vercel URL (no trailing slash), then **redeploy** the backend.
 
 ---
 
@@ -91,7 +89,7 @@ curl -X POST https://YOUR_RENDER_URL/api/admin/setup \
 
 - **Render free tier** sleeps after idle; first request can take 30–60s.
 - **First face verify** may download DeepFace models (several minutes once).
-- **WebAuthn** only works when `WEBAUTHN_*` matches the real HTTPS Vercel hostname.
+- **Fingerprint** uses the Mantra RD Service on the voter's own PC: open the site in Chrome or Edge on that PC and allow local network access.
 - `VITE_API_URL` is baked in at **build** time — change it → redeploy Vercel.
 
 ---

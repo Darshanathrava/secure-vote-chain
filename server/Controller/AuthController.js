@@ -85,7 +85,7 @@ exports.login = async (req, res) => {
     res.json({
       token,
       similarity: result.similarity ?? null,
-      fingerprintRegistered: Boolean(user.fingerprint?.registered || user.webauthnCredential?.id),
+      fingerprintRegistered: Boolean(user.fingerprint?.registered),
     });
   } catch (err) {
     console.error('Login error:', err);
