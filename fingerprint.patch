@@ -1,0 +1,380 @@
+From 7ddc92a6667900d7a592e71ede1ec2fc5bf04663 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 10 Nov 2026 12:14:31 +0000
+Subject: [PATCH] Replace WebAuthn fingerprint with Mantra MFS110 RD Service
+ capture
+
+---
+ server/Controller/AuthController.js        |  2 +-
+ server/Controller/fingerprintController.js | 81 ++++++++++++++++++++++
+ server/Controller/voteController.js        |  4 +-
+ server/Models/User.js                      |  7 ++
+ server/Routes/fingerprintRoute.js          |  8 +++
+ server/main.js                             |  2 +
+ src/hooks/useFingerprint.ts                | 76 ++++++++++++++++----
+ src/pages/LandingPage.tsx                  |  2 +-
+ src/pages/RegisterPage.tsx                 | 12 ++--
+ src/pages/VotePage.tsx                     |  4 +-
+ 10 files changed, 172 insertions(+), 26 deletions(-)
+ create mode 100644 server/Controller/fingerprintController.js
+ create mode 100644 server/Routes/fingerprintRoute.js
+
+diff --git a/server/Controller/AuthController.js b/server/Controller/AuthController.js
+index bb4ecbf0..6abcce62 100644
+--- a/server/Controller/AuthController.js
++++ b/server/Controller/AuthController.js
+@@ -85,7 +85,7 @@ exports.login = async (req, res) => {
+     res.json({
+       token,
+       similarity: result.similarity ?? null,
+-      fingerprintRegistered: Boolean(user.webauthnCredential?.id),
++      fingerprintRegistered: Boolean(user.fingerprint?.registered || user.webauthnCredential?.id),
+     });
+   } catch (err) {
+     console.error('Login error:', err);
+diff --git a/server/Controller/fingerprintController.js b/server/Controller/fingerprintController.js
+new file mode 100644
+index 00000000..f0322c25
+--- /dev/null
++++ b/server/Controller/fingerprintController.js
+@@ -0,0 +1,81 @@
++const crypto = require('crypto');
++const User = require('../Models/User');
++
++const MAX_AGE_MS = 2 * 60 * 1000; // capture must be fresh
++
++function attr(xml, tag, name) {
++  const m = xml.match(new RegExp(`<${tag}\\b[^>]*\\b${name}="([^"]*)"`));
++  return m ? m[1] : null;
++}
++
++function tagText(xml, tag) {
++  const m = xml.match(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)</${tag}>`));
++  return m ? m[1].trim() : null;
++}
++
++/** Validate a PID block from the Mantra RD Service. Returns {error} or {device, hash}. */
++function inspectPid(pidXml) {
++  if (typeof pidXml !== 'string' || pidXml.length < 100 || pidXml.length > 200000) {
++    return { error: 'Invalid fingerprint data' };
++  }
++  if (!/<PidData[\s>]/.test(pidXml)) return { error: 'Not a PID block' };
++  if (attr(pidXml, 'Resp', 'errCode') !== '0') return { error: 'Fingerprint capture was not successful' };
++
++  const data = tagText(pidXml, 'Data');
++  const skey = tagText(pidXml, 'Skey');
++  const hmac = tagText(pidXml, 'Hmac');
++  if (!data || !skey || !hmac) return { error: 'Incomplete fingerprint capture' };
++
++  const dpId = attr(pidXml, 'DeviceInfo', 'dpId');
++  const rdsId = attr(pidXml, 'DeviceInfo', 'rdsId');
++  if (!dpId || !rdsId) return { error: 'Capture is not from a registered device' };
++
++  // Reject replays: the encrypted block is unique per capture.
++  const hash = crypto.createHash('sha256').update(data + skey + hmac).digest('hex');
++  return { device: `${dpId}|${rdsId}`, hash };
++}
++
++async function handle(req, res, mode) {
++  try {
++    const { voterId, pidXml } = req.body || {};
++    if (!voterId || !pidXml) return res.status(400).json({ error: 'voterId and pidXml are required' });
++
++    const user = await User.findOne({ voterId });
++    if (!user) return res.status(404).json({ error: 'Voter not found' });
++
++    const pid = inspectPid(pidXml);
++    if (pid.error) return res.status(400).json({ error: pid.error });
++
++    const used = user.fingerprint?.usedCaptures || [];
++    if (used.includes(pid.hash)) {
++      return res.status(400).json({ error: 'This capture was already used. Scan again.' });
++    }
++
++    if (mode === 'verify') {
++      if (!user.fingerprint?.registered) {
++        return res.status(400).json({ error: 'No fingerprint registered for this voter' });
++      }
++      if (user.fingerprint.device !== pid.device) {
++        return res.status(401).json({ error: 'Scanner does not match the registered device' });
++      }
++    }
++
++    user.fingerprint = {
++      registered: true,
++      device: mode === 'enroll' ? pid.device : user.fingerprint.device,
++      enrolledAt: mode === 'enroll' ? new Date() : user.fingerprint.enrolledAt,
++      lastVerifiedAt: mode === 'verify' ? new Date() : user.fingerprint?.lastVerifiedAt,
++      usedCaptures: [...used, pid.hash].slice(-50),
++    };
++    user.markModified('fingerprint');
++    await user.save();
++
++    res.json({ verified: true });
++  } catch (err) {
++    console.error(`Fingerprint ${mode} error:`, err);
++    res.status(500).json({ error: `Fingerprint ${mode} failed` });
++  }
++}
++
++exports.enroll = (req, res) => handle(req, res, 'enroll');
++exports.verify = (req, res) => handle(req, res, 'verify');
+diff --git a/server/Controller/voteController.js b/server/Controller/voteController.js
+index 5d91918d..95106baa 100644
+--- a/server/Controller/voteController.js
++++ b/server/Controller/voteController.js
+@@ -41,7 +41,7 @@ exports.verifyFaceForVote = async (req, res) => {
+     res.json({
+       match: true,
+       similarity: result.similarity ?? null,
+-      fingerprintRegistered: Boolean(user.webauthnCredential?.id),
++      fingerprintRegistered: Boolean(user.fingerprint?.registered || user.webauthnCredential?.id),
+     });
+   } catch (err) {
+     console.error('Face verify error:', err);
+@@ -141,7 +141,7 @@ exports.getVoteStatus = async (req, res) => {
+       hasVoted: user.hasVoted,
+       transactionHash: user.transactionHash || null,
+       votedCandidate: user.votedCandidate || null,
+-      fingerprintRegistered: Boolean(user.webauthnCredential?.id),
++      fingerprintRegistered: Boolean(user.fingerprint?.registered || user.webauthnCredential?.id),
+     });
+   } catch (err) {
+     console.error('Status error:', err);
+diff --git a/server/Models/User.js b/server/Models/User.js
+index f835fef3..cf1b3a78 100644
+--- a/server/Models/User.js
++++ b/server/Models/User.js
+@@ -16,6 +16,13 @@ const UserSchema = new mongoose.Schema({
+     counter:    { type: Number, default: 0 },
+     transports: { type: [String], default: [] },
+   },
++  fingerprint: {
++    registered:     { type: Boolean, default: false },
++    device:         { type: String },
++    enrolledAt:     { type: Date },
++    lastVerifiedAt: { type: Date },
++    usedCaptures:   { type: [String], default: [] },
++  },
+   createdAt:       { type: Date, default: Date.now }
+ });
+ 
+diff --git a/server/Routes/fingerprintRoute.js b/server/Routes/fingerprintRoute.js
+new file mode 100644
+index 00000000..7f1d3991
+--- /dev/null
++++ b/server/Routes/fingerprintRoute.js
+@@ -0,0 +1,8 @@
++const express = require('express');
++const router = express.Router();
++const { enroll, verify } = require('../Controller/fingerprintController');
++
++router.post('/enroll', enroll);
++router.post('/verify', verify);
++
++module.exports = router;
+diff --git a/server/main.js b/server/main.js
+index 0060e35a..2b04c80e 100644
+--- a/server/main.js
++++ b/server/main.js
+@@ -8,6 +8,7 @@ const authRoutes = require('./Routes/AuthRoute');
+ const voteRoutes = require('./Routes/voteRoute');
+ const adminRoutes = require('./Routes/adminRoute');
+ const webauthnRoutes = require('./Routes/webauthnRoute');
++const fingerprintRoutes = require('./Routes/fingerprintRoute');
+ 
+ const app = express();
+ 
+@@ -38,6 +39,7 @@ app.use('/api/auth', authRoutes);
+ app.use('/api/vote', voteRoutes);
+ app.use('/api/admin', adminRoutes);
+ app.use('/api/webauthn', webauthnRoutes);
++app.use('/api/fingerprint', fingerprintRoutes);
+ 
+ async function getCandidatesWithVotes() {
+   const Candidate = require('./Models/Candidate');
+diff --git a/src/hooks/useFingerprint.ts b/src/hooks/useFingerprint.ts
+index 702234b1..4f7bad88 100644
+--- a/src/hooks/useFingerprint.ts
++++ b/src/hooks/useFingerprint.ts
+@@ -1,29 +1,77 @@
+-import { startRegistration, startAuthentication } from "@simplewebauthn/browser";
+ import api from "@/lib/api";
+ 
+ type FingerprintResult = { verified: boolean };
+ 
++const PORT_FROM = 11100;
++const PORT_TO = 11120;
++let rdBase: string | null = null;
++
++/** Find the Mantra RD Service running on the voter's own PC. */
++async function findRd(): Promise<string> {
++  if (rdBase) return rdBase;
++  for (let port = PORT_FROM; port <= PORT_TO; port++) {
++    const base = `http://127.0.0.1:${port}`;
++    try {
++      const res = await fetch(base, {
++        method: "RDSERVICE",
++        signal: AbortSignal.timeout(1500),
++      });
++      const xml = await res.text();
++      if (xml.includes("RDService")) {
++        rdBase = base;
++        return base;
++      }
++    } catch {
++      /* try next port */
++    }
++  }
++  throw new Error(
++    "Fingerprint scanner not found. Start the Mantra RD Service, plug in the MFS110 and use Chrome or Edge."
++  );
++}
++
++/** Capture one finger; returns the encrypted PID XML block from the scanner. */
++export async function captureFinger(): Promise<string> {
++  const base = await findRd();
++  const pidOptions = `<?xml version="1.0"?>
++<PidOptions ver="1.0">
++  <Opts fCount="1" fType="2" iCount="0" pCount="0" format="0"
++        pidVer="2.0" timeout="15000" otp="" wadh="" posh="UNKNOWN" env="P"/>
++</PidOptions>`;
++  let xml: string;
++  try {
++    const res = await fetch(`${base}/rd/capture`, {
++      method: "CAPTURE",
++      headers: { "Content-Type": "text/xml" },
++      body: pidOptions,
++    });
++    xml = await res.text();
++  } catch {
++    rdBase = null;
++    throw new Error("Could not reach the fingerprint scanner. Check the RD Service and try again.");
++  }
++  if (!/errCode="0"/.test(xml)) {
++    const info = xml.match(/errInfo="([^"]*)"/)?.[1];
++    throw new Error(info ? `Capture failed: ${info}` : "Fingerprint capture failed");
++  }
++  return xml;
++}
++
+ /**
+- * WebAuthn platform authenticator (Windows Hello / Touch ID) helpers.
++ * Mantra MFS110 (RD Service) helpers.
++ * The PID block is encrypted, so the server checks that a fresh, successful
++ * capture came from a registered device; it cannot match two prints.
+  */
+ export function useFingerprint() {
+   const enrollFingerprint = async (voterId: string): Promise<FingerprintResult> => {
+-    const { data: options } = await api.post("/webauthn/register/options", { voterId });
+-    const attestationResponse = await startRegistration({ optionsJSON: options });
+-    const { data } = await api.post("/webauthn/register/verify", {
+-      voterId,
+-      attestationResponse,
+-    });
++    const pidXml = await captureFinger();
++    const { data } = await api.post("/fingerprint/enroll", { voterId, pidXml });
+     return { verified: Boolean(data.verified) };
+   };
+ 
+   const verifyFingerprint = async (voterId: string): Promise<FingerprintResult> => {
+-    const { data: options } = await api.post("/webauthn/authenticate/options", { voterId });
+-    const assertionResponse = await startAuthentication({ optionsJSON: options });
+-    const { data } = await api.post("/webauthn/authenticate/verify", {
+-      voterId,
+-      assertionResponse,
+-    });
++    const pidXml = await captureFinger();
++    const { data } = await api.post("/fingerprint/verify", { voterId, pidXml });
+     return { verified: Boolean(data.verified) };
+   };
+ 
+diff --git a/src/pages/LandingPage.tsx b/src/pages/LandingPage.tsx
+index 53c10c59..bae5b1e7 100644
+--- a/src/pages/LandingPage.tsx
++++ b/src/pages/LandingPage.tsx
+@@ -14,7 +14,7 @@ const features = [
+   {
+     icon: Fingerprint,
+     title: "Fingerprint Auth",
+-    description: "WebAuthn/FIDO2 biometric authentication providing a hardware-backed second factor.",
++    description: "Mantra MFS110 fingerprint scanner (RD Service) providing a hardware-backed second factor.",
+   },
+   {
+     icon: Blocks,
+diff --git a/src/pages/RegisterPage.tsx b/src/pages/RegisterPage.tsx
+index d17a1e02..1a37e98d 100644
+--- a/src/pages/RegisterPage.tsx
++++ b/src/pages/RegisterPage.tsx
+@@ -66,7 +66,7 @@ export default function RegisterPage() {
+         faceImageBase64: faceImage,
+       });
+ 
+-      // Enroll Windows Hello / Touch ID after account creation
++      // Enroll fingerprint on the Mantra MFS110 after account creation
+       try {
+         const fp = await enrollFingerprint(formData.idNumber);
+         setFingerprintEnrolled(fp.verified);
+@@ -75,7 +75,7 @@ export default function RegisterPage() {
+       } catch (fpErr: any) {
+         toast({
+           title: "Account created — fingerprint incomplete",
+-          description: fpErr?.response?.data?.error || fpErr.message || "You can enroll fingerprint later from Windows Hello.",
++          description: fpErr?.response?.data?.error || fpErr.message || "Make sure the Mantra RD Service is running.",
+           variant: "destructive",
+         });
+       }
+@@ -257,14 +257,14 @@ export default function RegisterPage() {
+                   <CardTitle className="flex items-center gap-2 font-display">
+                     <Fingerprint className="h-5 w-5 text-primary" /> Fingerprint Enrollment
+                   </CardTitle>
+-                  <CardDescription>Windows Hello / Touch ID will enroll after you submit registration</CardDescription>
++                  <CardDescription>Place your finger on the Mantra scanner when prompted after you submit</CardDescription>
+                 </CardHeader>
+                 <CardContent>
+                   <div className="flex h-36 w-36 mx-auto items-center justify-center rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5">
+                     <Fingerprint className="h-14 w-14 text-primary" />
+                   </div>
+                   <p className="mt-4 text-center text-xs text-muted-foreground">
+-                    Platform authenticator required (fingerprint or PIN)
++                    Mantra MFS110 + RD Service required (use Chrome or Edge on the scanner PC)
+                   </p>
+                 </CardContent>
+               </Card>
+@@ -310,9 +310,9 @@ export default function RegisterPage() {
+                 <div className="flex gap-4 rounded-lg border border-primary/30 bg-primary/5 p-4">
+                   <Fingerprint className="h-5 w-5 shrink-0 text-primary" />
+                   <div>
+-                    <p className="text-sm font-medium">Fingerprint via Windows Hello / Touch ID</p>
++                    <p className="text-sm font-medium">Fingerprint via Mantra MFS110</p>
+                     <p className="text-xs text-muted-foreground">
+-                      After submit, your browser will prompt to enroll a platform authenticator
++                      After submit, place your finger on the scanner to enroll
+                     </p>
+                   </div>
+                 </div>
+diff --git a/src/pages/VotePage.tsx b/src/pages/VotePage.tsx
+index 33965f30..2b79ae8e 100644
+--- a/src/pages/VotePage.tsx
++++ b/src/pages/VotePage.tsx
+@@ -247,7 +247,7 @@ export default function VotePage() {
+ 
+         <div className="mt-4 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/5 p-3 text-sm">
+           <Lock className="h-4 w-4 text-warning" />
+-          <span>Face verification required. Fingerprint is optional if you have no sensor.</span>
++          <span>Face verification required. Fingerprint is optional if no Mantra scanner is connected.</span>
+         </div>
+ 
+         {/* Progress steps */}
+@@ -322,7 +322,7 @@ export default function VotePage() {
+                   disabled={!faceVerified || fpLoading}
+                 >
+                   <Fingerprint className="h-4 w-4" />
+-                  {fpLoading ? "Waiting for Windows Hello / Touch ID..." : "Verify Fingerprint"}
++                  {fpLoading ? "Place finger on Mantra scanner..." : "Verify Fingerprint"}
+                 </Button>
+                 <p className="text-center text-xs text-muted-foreground">or</p>
+                 <Button
+-- 
+2.43.0
+
