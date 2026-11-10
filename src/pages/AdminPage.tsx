@@ -220,6 +220,9 @@ export default function AdminPage() {
     }
   };
 
+  const selectClass =
+    "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
   // ── LOGIN SCREEN ──
   if (!isLoggedIn) {
     return (
@@ -340,8 +343,23 @@ export default function AdminPage() {
                     </div>
                     <div>
                       <Label>Region</Label>
-                      <Input value={editingCandidate.region}
-                        onChange={e => setEditingCandidate({ ...editingCandidate, region: e.target.value })} />
+                      <select
+                        className={selectClass}
+                        value={editingCandidate.region}
+                        onChange={e => setEditingCandidate({ ...editingCandidate, region: e.target.value })}
+                      >
+                        <option value="National">National</option>
+                        {editingCandidate.region &&
+                          editingCandidate.region !== "National" &&
+                          !regions.some(r => r.name === editingCandidate.region) && (
+                            <option value={editingCandidate.region}>
+                              {editingCandidate.region} (not in regions list)
+                            </option>
+                          )}
+                        {regions.filter(r => r.isActive !== false).map(r => (
+                          <option key={r._id} value={r.name}>{r.name} ({r.code})</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <Label>Blockchain ID</Label>
@@ -372,8 +390,16 @@ export default function AdminPage() {
                   </div>
                   <div>
                     <Label>Region</Label>
-                    <Input placeholder="National" value={newCandidate.region}
-                      onChange={e => setNewCandidate({ ...newCandidate, region: e.target.value })} />
+                    <select
+                      className={selectClass}
+                      value={newCandidate.region}
+                      onChange={e => setNewCandidate({ ...newCandidate, region: e.target.value })}
+                    >
+                      <option value="National">National</option>
+                      {regions.filter(r => r.isActive !== false).map(r => (
+                        <option key={r._id} value={r.name}>{r.name} ({r.code})</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <Label>Blockchain Candidate ID</Label>
