@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { useFingerprint, captureWithDetails, type FingerprintScan } from "@/hooks/useFingerprint";
+import { useFingerprint, captureWithDetails, getDeviceInfo, type FingerprintScan } from "@/hooks/useFingerprint";
 import FingerprintDevicePanel from "@/components/FingerprintDevicePanel";
 import api from "@/lib/api";
 
@@ -29,6 +29,7 @@ export default function RegisterPage() {
   const [fingerPid, setFingerPid] = useState<string | null>(null);
   const [fingerScan, setFingerScan] = useState<FingerprintScan | null>(null);
   const [fingerCapturing, setFingerCapturing] = useState(false);
+  const [fingerDevice, setFingerDevice] = useState("");
 
   const captureFingerprint = async () => {
     setFingerCapturing(true);
@@ -37,6 +38,12 @@ export default function RegisterPage() {
       const { pidXml, scan } = await captureWithDetails();
       setFingerPid(pidXml);
       setFingerScan(scan);
+      try {
+        const d = await getDeviceInfo();
+        setFingerDevice(d.model + (d.serial ? ` (S/N ${d.serial})` : ""));
+      } catch {
+        setFingerDevice("Mantra MFS110");
+      }
       toast({ title: "Fingerprint Captured ✓", description: "Biometric data ready for enrollment." });
     } catch (e: any) {
       toast({ title: "Fingerprint Error", description: e.message || "Could not capture fingerprint", variant: "destructive" });
@@ -310,7 +317,7 @@ export default function RegisterPage() {
                       </div>
                       <Button
                         variant="outline"
-                        onClick={() => { setFingerPid(null); setFingerScan(null); }}
+                        onClick={() => { setFingerPid(null); setFingerScan(null); setFingerDevice(""); }}
                         className="w-full"
                       >
                         Retake Fingerprint
@@ -359,13 +366,16 @@ export default function RegisterPage() {
                     <p className="text-xs text-muted-foreground">128-dimensional AI face encoding ready for secure storage</p>
                   </div>
                 </div>
-                <div className="flex gap-4 rounded-lg border border-primary/30 bg-primary/5 p-4">
-                  <Fingerprint className="h-5 w-5 shrink-0 text-primary" />
+                <div className="flex gap-4 rounded-lg border border-success/30 bg-success/5 p-4">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-success" />
                   <div>
-                    <p className="text-sm font-medium">Fingerprint via Mantra MFS110</p>
+                    <p className="text-sm font-medium">Fingerprint Captured</p>
                     <p className="text-xs text-muted-foreground">
-                      Captured on the Mantra scanner and enrolled on submit
+                      {fingerDevice || "Mantra MFS110"}
+                      {fingerScan?.quality != null ? ` · quality ${fingerScan.quality}/100` : ""}
+                      {fingerScan?.minutiae != null ? ` · ${fingerScan.minutiae} points` : ""}
                     </p>
+                    <p className="text-xs text-muted-foreground">Will be enrolled when you submit</p>
                   </div>
                 </div>
                 <div className="flex gap-4 rounded-lg border border-primary/30 bg-primary/5 p-4">
