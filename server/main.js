@@ -11,15 +11,33 @@ const fingerprintRoutes = require('./Routes/fingerprintRoute');
 
 const app = express();
 
-const allowedOrigins = (process.env.FRONTEND_ORIGIN || 'http://localhost:5173')
+const defaultOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://*.vercel.app',
+];
+
+const configuredOrigins = (process.env.FRONTEND_ORIGIN || defaultOrigins.join(','))
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const allowedOrigins = [...new Set(configuredOrigins)];
+
+const originIsAllowed = (origin) => {
+  if (!origin) return true;
+  if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) return true;
+
+  return allowedOrigins.some((allowedOrigin) => {
+    if (!allowedOrigin.includes('*')) return false;
+    const pattern = new RegExp(`^${allowedOrigin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '.*')}$`);
+    return pattern.test(origin);
+  });
+};
+
 app.use(cors({
   origin(origin, callback) {
-    // Allow non-browser clients (no Origin) and configured frontends
-    if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+    if (originIsAllowed(origin)) {
       return callback(null, true);
     }
     return callback(null, false);
