@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useFingerprint } from "@/hooks/useFingerprint";
+import FingerprintDevicePanel from "@/components/FingerprintDevicePanel";
 import api from "@/lib/api";
 
 type Step = "personal" | "biometric" | "review";
@@ -266,6 +267,7 @@ export default function RegisterPage() {
                   <p className="mt-4 text-center text-xs text-muted-foreground">
                     Mantra MFS110 + RD Service required (use Chrome or Edge on the scanner PC)
                   </p>
+                  <FingerprintDevicePanel />
                 </CardContent>
               </Card>
 
