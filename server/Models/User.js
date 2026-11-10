@@ -10,12 +10,6 @@ const UserSchema = new mongoose.Schema({
   walletAddress:   { type: String, default: '' },
   transactionHash: { type: String, default: null },
   votedCandidate:  { type: String, default: null },
-  webauthnCredential: {
-    id:         { type: String },
-    publicKey:  { type: String },
-    counter:    { type: Number, default: 0 },
-    transports: { type: [String], default: [] },
-  },
   fingerprint: {
     registered:     { type: Boolean, default: false },
     device:         { type: String },

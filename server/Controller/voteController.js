@@ -41,7 +41,7 @@ exports.verifyFaceForVote = async (req, res) => {
     res.json({
       match: true,
       similarity: result.similarity ?? null,
-      fingerprintRegistered: Boolean(user.fingerprint?.registered || user.webauthnCredential?.id),
+      fingerprintRegistered: Boolean(user.fingerprint?.registered),
     });
   } catch (err) {
     console.error('Face verify error:', err);
@@ -141,7 +141,7 @@ exports.getVoteStatus = async (req, res) => {
       hasVoted: user.hasVoted,
       transactionHash: user.transactionHash || null,
       votedCandidate: user.votedCandidate || null,
-      fingerprintRegistered: Boolean(user.fingerprint?.registered || user.webauthnCredential?.id),
+      fingerprintRegistered: Boolean(user.fingerprint?.registered),
     });
   } catch (err) {
     console.error('Status error:', err);
