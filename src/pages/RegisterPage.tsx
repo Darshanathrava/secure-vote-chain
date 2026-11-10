@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { useFingerprint } from "@/hooks/useFingerprint";
+import { useFingerprint, captureWithDetails, type FingerprintScan } from "@/hooks/useFingerprint";
 import FingerprintDevicePanel from "@/components/FingerprintDevicePanel";
 import api from "@/lib/api";
 
@@ -25,7 +25,25 @@ export default function RegisterPage() {
   const [registered, setRegistered] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { toast } = useToast();
-  const { enrollFingerprint } = useFingerprint();
+  const { enrollWithCapture } = useFingerprint();
+  const [fingerPid, setFingerPid] = useState<string | null>(null);
+  const [fingerScan, setFingerScan] = useState<FingerprintScan | null>(null);
+  const [fingerCapturing, setFingerCapturing] = useState(false);
+
+  const captureFingerprint = async () => {
+    setFingerCapturing(true);
+    try {
+      toast({ title: "Place your finger", description: "Put your finger on the Mantra scanner now." });
+      const { pidXml, scan } = await captureWithDetails();
+      setFingerPid(pidXml);
+      setFingerScan(scan);
+      toast({ title: "Fingerprint Captured ✓", description: "Biometric data ready for enrollment." });
+    } catch (e: any) {
+      toast({ title: "Fingerprint Error", description: e.message || "Could not capture fingerprint", variant: "destructive" });
+    } finally {
+      setFingerCapturing(false);
+    }
+  };
 
   const startCamera = async () => {
     setFaceCapturing(true);
@@ -57,6 +75,10 @@ export default function RegisterPage() {
       toast({ title: "Missing face photo", description: "Please capture your face first", variant: "destructive" });
       return;
     }
+    if (!fingerPid) {
+      toast({ title: "Missing fingerprint", description: "Please capture your fingerprint first", variant: "destructive" });
+      return;
+    }
     setLoading(true);
     try {
       await api.post("/auth/register", {
@@ -69,7 +91,7 @@ export default function RegisterPage() {
 
       // Enroll fingerprint on the Mantra MFS110 after account creation
       try {
-        const fp = await enrollFingerprint(formData.idNumber);
+        const fp = await enrollWithCapture(formData.idNumber, fingerPid);
         setFingerprintEnrolled(fp.verified);
         if (!fp.verified) throw new Error("Fingerprint enrollment not verified");
         toast({ title: "Registration Successful!", description: "Face and fingerprint enrolled." });
@@ -258,22 +280,50 @@ export default function RegisterPage() {
                   <CardTitle className="flex items-center gap-2 font-display">
                     <Fingerprint className="h-5 w-5 text-primary" /> Fingerprint Enrollment
                   </CardTitle>
-                  <CardDescription>Place your finger on the Mantra scanner when prompted after you submit</CardDescription>
+                  <CardDescription>Capture your fingerprint with the Mantra scanner</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex h-36 w-36 mx-auto items-center justify-center rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5">
-                    <Fingerprint className="h-14 w-14 text-primary" />
-                  </div>
-                  <p className="mt-4 text-center text-xs text-muted-foreground">
-                    Mantra MFS110 + RD Service required (use Chrome or Edge on the scanner PC)
-                  </p>
+                <CardContent className="space-y-4">
+                  {!fingerPid ? (
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="flex h-36 w-36 items-center justify-center rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5">
+                        <Fingerprint className={`h-14 w-14 text-primary ${fingerCapturing ? "animate-pulse" : ""}`} />
+                      </div>
+                      <Button onClick={captureFingerprint} className="w-full gap-2" disabled={fingerCapturing}>
+                        <Fingerprint className="h-4 w-4" />
+                        {fingerCapturing ? "Place finger on scanner..." : "Capture Fingerprint"}
+                      </Button>
+                      <p className="text-center text-xs text-muted-foreground">
+                        Mantra MFS110 + RD Service required (use Chrome or Edge on the scanner PC)
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3 rounded-lg bg-success/10 p-4">
+                        <CheckCircle2 className="h-6 w-6 text-success" />
+                        <div>
+                          <p className="font-medium text-success">Fingerprint Captured ✓</p>
+                          <p className="text-xs text-muted-foreground">
+                            {fingerScan?.quality != null ? `Print quality ${fingerScan.quality}/100 · ` : ""}
+                            ready for enrollment
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => { setFingerPid(null); setFingerScan(null); }}
+                        className="w-full"
+                      >
+                        Retake Fingerprint
+                      </Button>
+                    </div>
+                  )}
                   <FingerprintDevicePanel />
                 </CardContent>
               </Card>
 
               <div className="flex gap-4">
                 <Button variant="outline" onClick={() => setStep("personal")} className="flex-1">Back</Button>
-                <Button onClick={() => setStep("review")} className="flex-1 gap-2" disabled={!faceImage}>
+                <Button onClick={() => setStep("review")} className="flex-1 gap-2" disabled={!faceImage || !fingerPid}>
                   Continue to Review <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -314,7 +364,7 @@ export default function RegisterPage() {
                   <div>
                     <p className="text-sm font-medium">Fingerprint via Mantra MFS110</p>
                     <p className="text-xs text-muted-foreground">
-                      After submit, place your finger on the scanner to enroll
+                      Captured on the Mantra scanner and enrolled on submit
                     </p>
                   </div>
                 </div>
