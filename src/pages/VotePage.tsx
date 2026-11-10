@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useFingerprint } from "@/hooks/useFingerprint";
+import FingerprintDevicePanel from "@/components/FingerprintDevicePanel";
 import api from "@/lib/api";
 
 type VoteStep = "face" | "fingerprint" | "ballot";
@@ -315,6 +316,7 @@ export default function VotePage() {
             </h2>
             {!fingerprintVerified ? (
               <div className="space-y-3">
+                <FingerprintDevicePanel />
                 <Button
                   variant="outline"
                   onClick={handleFingerprint}
