@@ -1,0 +1,24 @@
+From 8dd7529f5dbca4135e898ad8e745c798c27cb362 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 10 Nov 2026 13:08:58 +0000
+Subject: [PATCH] render.yaml: use the free plan
+
+---
+ render.yaml | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/render.yaml b/render.yaml
+index 45a83a73..464e4a16 100644
+--- a/render.yaml
++++ b/render.yaml
+@@ -3,6 +3,7 @@ services:
+   - type: web
+     name: secure-vote-chain-api
+     runtime: docker
++    plan: free
+     rootDir: server
+     dockerfilePath: ./Dockerfile
+     healthCheckPath: /health
+-- 
+2.43.0
+
