@@ -1,122 +1,134 @@
-
 # Secure Vote Chain
 
-A full-stack electronic voting platform that combines **blockchain-based vote recording** with **facial-recognition voter verification**. Votes are cast as transactions on an Ethereum-compatible smart contract (via MetaMask), while voter identity, election metadata, and results are managed through a MongoDB-backed REST API.
+A full-stack electronic voting platform that combines **blockchain-based vote recording** with **biometric voter verification** (facial recognition, with an optional fingerprint step). Votes are cast as transactions on an Ethereum-compatible smart contract via MetaMask, while voter identity, election metadata and results are managed by a MongoDB-backed REST API.
 
-The goal of the project is to demonstrate how decentralized ledgers and biometric verification can be combined to build a voting system that is tamper-resistant, auditable, and resistant to duplicate voting.
+The goal is to demonstrate how decentralized ledgers and biometrics can be combined into a voting system that is tamper-resistant, auditable and resistant to duplicate voting.
+
+**Live demo:** [srcurevoting.vercel.app](https://srcurevoting.vercel.app) *(API on Render free tier, so the first request may take ~30–60 s to wake up)*
+
+---
 
 ## Table of Contents
 
 - [Features](#features)
+- [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Configuration](#configuration)
-- [Running the Project](#running-the-project)
-- [Usage Guidelines](#usage-guidelines)
-- [Contributing Guidelines](#contributing-guidelines)
+- [Running Locally](#running-locally)
+- [Deployment](#deployment)
+- [Usage Guide](#usage-guide)
+- [Security Notes](#security-notes)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
 - [License](#license)
 - [Contact](#contact)
 
+---
+
 ## Features
 
-- **Blockchain-backed voting** — Votes are recorded on-chain via a Solidity smart contract (`Voting.sol`), preventing tampering or retroactive edits once a vote is cast.
-- **One-vote enforcement** — The smart contract tracks voter addresses (`hasVoted`) to prevent duplicate votes at the contract level, in addition to backend checks.
-- **Facial recognition verification** — Voter identity is verified against a stored face embedding using DeepFace (Facenet model) before a vote is permitted.
-- **MetaMask wallet integration** — Voters connect an Ethereum wallet (via `ethers.js`) to sign and submit their vote transaction.
-- **Admin controls** — Admins can add candidates and close voting through dedicated smart contract functions.
-- **Election management API** — REST endpoints for authentication, vote casting, vote status, and active election data, backed by MongoDB/Mongoose models for Users, Candidates, and Elections.
-- **Modern frontend** — A Vite + React + TypeScript SPA (with Tailwind CSS and Radix UI components) provides landing, registration, authentication, voting, admin, and results pages.
+- **Blockchain-backed voting** — votes are recorded on-chain by a Solidity contract (`Voting.sol`), so they can't be edited after the fact.
+- **One-vote enforcement** — the contract tracks voter addresses (`hasVoted`) to block duplicate votes, in addition to backend checks.
+- **Facial recognition verification** — the voter's live face is compared against a stored embedding using DeepFace (Facenet) before voting is allowed.
+- **Fingerprint verification (in progress)** — an additional biometric step using a Mantra MFS110 scanner.
+- **MetaMask integration** — voters sign and submit their vote with their own wallet through `ethers.js`.
+- **Admin controls** — admins can add candidates and close voting through restricted contract functions.
+- **Election management API** — REST endpoints for authentication, vote casting, vote status and active election data (Mongoose models: User, Candidate, Election).
+- **Modern frontend** — Vite + React + TypeScript SPA with Tailwind CSS and Radix UI: landing, registration, authentication, voting, admin and results pages.
 
-> **Note:** The repository also contains a `client/` directory with an earlier Create React App–based frontend. This is retained for reference; the actively maintained frontend lives in `src/`.
+> **Note:** `client/` holds an earlier Create React App frontend kept for reference. The maintained frontend is in `src/`.
+
+## Architecture
+
+```
+┌──────────────┐    REST     ┌───────────────┐   python-shell /    ┌──────────────────┐
+│ React (Vite) │ ──────────▶ │ Express API   │ ──── HTTP ────────▶ │ Face service     │
+│  Vercel      │             │  Render       │                     │ (Python/DeepFace)│
+└──────┬───────┘             └───────┬───────┘                     └──────────────────┘
+       │ ethers.js                   │ Mongoose
+       ▼                             ▼
+┌──────────────┐             ┌───────────────┐
+│ MetaMask +   │             │ MongoDB Atlas │
+│ Voting.sol   │             └───────────────┘
+└──────────────┘
+```
+
+**Vote flow:** register (face enrolled) → authenticate (face verified) → connect wallet → cast vote on-chain → results read from the blockchain.
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS, Radix UI, React Router, TanStack Query |
-| Blockchain | Solidity `^0.8.0`, Truffle, Ganache, `ethers.js`, MetaMask |
-| Backend | Node.js, Express, Mongoose (MongoDB) |
-| Auth | JSON Web Tokens (`jsonwebtoken`), `bcryptjs` |
-| Face Verification | Python, OpenCV, DeepFace (Facenet embeddings), invoked from Node via `python-shell` |
-| Testing | Vitest, Testing Library |
+| Layer             | Technology                                                                        |
+| ----------------- | --------------------------------------------------------------------------------- |
+| Frontend          | React 19, TypeScript, Vite, Tailwind CSS, Radix UI, React Router, TanStack Query  |
+| Blockchain        | Solidity `^0.8.0`, Truffle, Ganache, `ethers.js`, MetaMask                        |
+| Backend           | Node.js, Express, Mongoose (MongoDB)                                              |
+| Auth              | JSON Web Tokens (`jsonwebtoken`), `bcryptjs`                                      |
+| Face verification | Python, OpenCV, DeepFace (Facenet embeddings)                                     |
+| Fingerprint       | Mantra MFS110 (in progress)                                                       |
+| Hosting           | Vercel (frontend), Render (API), MongoDB Atlas (database)                         |
+| Testing           | Vitest, Testing Library                                                           |
 
 ## Project Structure
 
 ```
 secure-vote-chain/
 ├── src/                     # Active frontend (Vite + React + TypeScript)
-│   ├── pages/                # Landing, Register, Authenticate, Vote, Admin, Results
+│   ├── pages/                 # Landing, Register, Authenticate, Vote, Admin, Results
 │   ├── components/            # Shared UI and layout components
-│   └── lib/                   # API client, smart contract bindings, constants
-├── server/                  # Express backend
+│   └── lib/                   # API client, contract bindings, constants
+├── server/                  # Express backend (deploy root on Render)
 │   ├── Controller/            # Auth and vote controllers
-│   ├── Models/                 # Mongoose schemas: User, Candidate, Election
-│   ├── Routes/                  # /api/auth and /api/vote routes
-│   └── face_service/            # Python DeepFace scripts for encode/verify
+│   ├── Models/                # Mongoose schemas: User, Candidate, Election
+│   ├── Routes/                # /api/auth and /api/vote routes
+│   └── face_service/          # Python DeepFace scripts (encode / verify)
 ├── smart_contract/          # Truffle project
 │   ├── contracts/             # Voting.sol, Transaction.sol
-│   └── migrations/             # Deployment scripts
-├── client/                  # Legacy CRA-based frontend (reference only)
+│   └── migrations/            # Deployment scripts
+├── client/                  # Legacy CRA frontend (reference only)
 └── dist/                    # Production build output
 ```
 
 ## Prerequisites
 
-Make sure the following are installed before setting up the project:
-
 - **Node.js** v18+ and npm
-- **MongoDB** (local instance or a hosted URI, e.g. MongoDB Atlas)
-- **Python** 3.10–3.11 with `pip` (for the face-recognition service; DeepFace/OpenCV compatibility is best on these versions)
-- **Truffle** (`npm install -g truffle`) and **Ganache** (GUI or CLI) for a local Ethereum blockchain
-- **MetaMask** browser extension, configured to connect to your local Ganache network
+- **MongoDB** (local, or a MongoDB Atlas URI)
+- **Python** 3.10–3.11 with `pip` (best DeepFace/OpenCV compatibility)
+- **Truffle** (`npm install -g truffle`) and **Ganache** (GUI or CLI)
+- **MetaMask** browser extension
+- *(Optional)* Mantra MFS110 scanner and its RD service/drivers for the fingerprint step
 
 ## Installation
 
-1. **Clone the repository**
+```bash
+# 1. Clone
+git clone https://github.com/Darshanathrava/secure-vote-chain.git
+cd secure-vote-chain
 
-   ```bash
-   git clone https://github.com/Darshanathrava/secure-vote-chain.git
-   cd secure-vote-chain
-   ```
+# 2. Frontend dependencies
+npm install
 
-2. **Install frontend dependencies** (root project)
+# 3. Backend dependencies
+cd server && npm install && cd ..
 
-   ```bash
-   npm install
-   ```
+# 4. Python face-verification dependencies
+cd server
+python -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
+pip install deepface opencv-python numpy
+cd ..
 
-3. **Install backend dependencies**
+# 5. Smart contract dependencies + compile
+cd smart_contract && npm install && truffle compile && cd ..
+```
 
-   ```bash
-   cd server
-   npm install
-   cd ..
-   ```
-
-4. **Install Python dependencies for face verification**
-
-   ```bash
-   cd server
-   python -m venv venv
-   source venv/bin/activate      # On Windows: venv\Scripts\activate
-   pip install deepface opencv-python numpy
-   cd ..
-   ```
-
-5. **Install smart contract dependencies and compile**
-
-   ```bash
-   cd smart_contract
-   npm install
-   truffle compile
-   cd ..
-   ```
+> **Windows + dlib:** if a package needs `dlib`, use a prebuilt wheel that matches your Python version instead of compiling it from source.
 
 ## Configuration
 
-Create a `.env` file inside `server/` with the following variables:
+Create `server/.env`:
 
 ```env
 MONGO_URI=your_mongodb_connection_string
@@ -127,84 +139,85 @@ EMAIL=your_notification_email@example.com
 EMAILPASSWORD=your_email_app_password
 ```
 
-On the frontend, the deployed contract address is read from `src/lib/constants.ts` (`CONTRACT_ADDRESS`) — update this after each contract deployment. The API base URL is set in `src/lib/api.ts` and defaults to `http://localhost:1322/api`.
+Frontend settings:
 
-**Never commit your `.env` file or private keys.** Ensure `server/.env` stays listed in `.gitignore`.
+- `CONTRACT_ADDRESS` in `src/lib/constants.ts` — update after every contract deployment.
+- API base URL in `src/lib/api.ts` — defaults to `http://localhost:1322/api`; point it at your deployed API in production.
 
-## Production deploy (Vercel + Render)
+**Never commit `.env` files, private keys, or biometric data.**
 
-See **[DEPLOY.md](DEPLOY.md)** for deploying the Vite frontend to Vercel and the Express + DeepFace API to Render (Docker) with MongoDB Atlas.
+## Running Locally
 
-Required env templates: [`.env.example`](.env.example) (frontend) and [`server/.env.example`](server/.env.example) (backend).
-
-## Running the Project
-
-1. **Start Ganache** and note the RPC URL (defaults to `http://127.0.0.1:7545`).
-
-2. **Deploy the smart contract:**
-
+1. **Start Ganache** (default RPC `http://127.0.0.1:7545`).
+2. **Deploy the contract:**
    ```bash
    cd smart_contract
    truffle migrate --network development
    cd ..
    ```
-
-   Copy the deployed contract address into `src/lib/constants.ts`.
-
-3. **Configure MetaMask** to connect to the Ganache network (Network Name: `Localhost 7545`, RPC URL: `http://127.0.0.1:7545`, Chain ID: `1337`) and import a Ganache account.
-
-4. **Run backend and frontend together:**
-
+   Copy the deployed address into `src/lib/constants.ts`.
+3. **Configure MetaMask** — Network `Localhost 7545`, RPC `http://127.0.0.1:7545`, Chain ID `1337` — and import a Ganache account.
+4. **Start everything:**
    ```bash
-   npm run dev
+   npm run dev          # Express API + Vite dev server via concurrently
+   ```
+   Or separately:
+   ```bash
+   npm run backend      # Express API on PORT
+   npm run frontend     # Vite dev server (http://localhost:5173)
    ```
 
-   This uses `concurrently` to start the Express server (`npm run backend`) and the Vite dev server (`npm run frontend`) in parallel.
+## Deployment
 
-   Alternatively, run them separately:
+| Component     | Platform       | Notes                                                                 |
+| ------------- | -------------- | --------------------------------------------------------------------- |
+| Frontend      | Vercel         | Build with Vite; set the API base URL to the Render service.          |
+| API           | Render         | Set **Root Directory** to `server`. Add the `.env` variables above in the Render dashboard. |
+| Database      | MongoDB Atlas  | Allow Render's outbound IPs (or `0.0.0.0/0` for testing) in Network Access. |
+| Face service  | Render (Docker) | DeepFace needs system libraries, so the Python service runs from a Docker runtime on Render. If the free tier runs out of memory, host the face step separately (e.g. Hugging Face Spaces) and call it over HTTP. |
 
-   ```bash
-   npm run backend     # Starts the Express API on the configured PORT
-   npm run frontend    # Starts the Vite dev server (default: http://localhost:5173)
-   ```
+**Free-tier caveats:** Render free instances sleep when idle, and TensorFlow/DeepFace is memory-heavy, so expect slow cold starts for face verification.
 
-5. Visit the frontend URL printed by Vite in your browser.
+**Blockchain network:** Ganache only exists on your machine. For a public deployment, deploy `Voting.sol` to a public testnet, update `CONTRACT_ADDRESS`, and have voters switch MetaMask to that network.
 
-## Usage Guidelines
+## Usage Guide
 
-1. **Register** a voter account on the Register page, capturing a reference face image that is encoded and stored against the voter's profile.
-2. **Authenticate** before voting: the app captures a live face image and verifies it against the stored encoding (cosine similarity threshold of 0.7) via the `face_service` scripts.
-3. **Connect a wallet** through MetaMask on the Vote page.
-4. **Cast a vote** for a candidate — this submits a transaction to the `Voting` smart contract and updates the voter's status once confirmed.
-5. **View results** on the Results page, which reads live vote counts directly from the blockchain.
-6. **Admins** can add candidates and close voting via the Admin page, which calls the contract's `addCandidate` and `closeVoting` functions (restricted to the deploying account).
+1. **Register** — create a voter account; a reference face image is captured, encoded and stored against the profile.
+2. **Authenticate** — a live face image is captured and verified against the stored encoding (cosine similarity threshold `0.7`). With fingerprint enabled, the scanner step follows.
+3. **Connect wallet** — link MetaMask on the Vote page.
+4. **Cast vote** — submits a transaction to the `Voting` contract; voter status updates once it confirms.
+5. **View results** — the Results page reads live counts from the blockchain.
+6. **Admin** — add candidates and close voting via the Admin page (`addCandidate`, `closeVoting`, restricted to the deploying account).
 
-## Contributing Guidelines
+## Security Notes
 
-Contributions are welcome. To propose a change:
+- Face embeddings and biometric data are sensitive. Don't commit face images or embedding files, and store only what's needed.
+- Keep `JWT_SECRET`, SMTP credentials and wallet private keys out of version control.
+- This is an academic/portfolio project and has not had a formal security audit. Don't use it for real elections.
 
-1. Fork the repository and create a feature branch:
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-2. Make your changes, following the existing code style (TypeScript/ESLint conventions on the frontend, standard Express patterns on the backend).
-3. Add or update tests where relevant (`npm run test` runs Vitest for the frontend).
-4. Run `npm run typecheck` to confirm there are no TypeScript errors.
-5. Commit using clear, descriptive messages (e.g. `feat: add candidate deletion endpoint`, `fix: correct face similarity threshold`).
-6. Push your branch and open a Pull Request describing the change, its motivation, and any testing performed.
-7. Be responsive to review feedback — small, focused PRs are easier to review and merge.
+## Roadmap
 
-Please avoid committing secrets, `.env` files, private keys, or biometric/face image data as part of any contribution.
+- [ ] Complete Mantra MFS110 fingerprint verification
+- [ ] Deploy contract to a public testnet
+- [ ] Liveness detection to resist photo/video spoofing
+- [ ] Screenshots / demo GIF
+- [ ] CI (lint, typecheck, tests)
+
+## Contributing
+
+1. Fork the repo and create a branch: `git checkout -b feature/your-feature-name`
+2. Follow the existing code style (TypeScript conventions on the frontend, standard Express patterns on the backend).
+3. Add or update tests (`npm run test`) and run `npm run typecheck`.
+4. Use clear commit messages (e.g. `feat: add candidate deletion endpoint`).
+5. Open a Pull Request describing the change and how you tested it.
 
 ## License
 
-This project does not yet include a `LICENSE` file. Until one is added, all rights are reserved by the repository owner by default, and the code should not be reused, modified, or redistributed without explicit permission.
-
-If you intend to open-source this project, adding a permissive license such as [MIT](https://choosealicense.com/licenses/mit/) is a common choice for academic and portfolio projects — it allows reuse with attribution and minimal restriction. You can add one by creating a `LICENSE` file at the project root using [choosealicense.com](https://choosealicense.com/) as a reference.
+No `LICENSE` file is included yet, so all rights are reserved by default. To open-source the project, add a license such as [MIT](https://choosealicense.com/licenses/mit/).
 
 ## Contact
 
 **Maintainer:** Darshan Athrava
 **Repository:** [github.com/Darshanathrava/secure-vote-chain](https://github.com/Darshanathrava/secure-vote-chain)
 
-For questions, bug reports, or feature requests, please [open an issue](https://github.com/Darshanathrava/secure-vote-chain/issues) on the repository.
+Questions or bugs? [Open an issue](https://github.com/Darshanathrava/secure-vote-chain/issues).
